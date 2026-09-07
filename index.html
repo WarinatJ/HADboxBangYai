@@ -1,11 +1,3 @@
-ได้ทำการแก้ไขโค้ดตามความต้องการเรียบร้อยครับ โดยปรับระบบของกล่อง **CPR** ใหม่ทั้งหมดดังนี้:
-
-* **ยกเลิก Lot แบบเหมาทั้งกล่อง:** เปลี่ยนให้กล่อง CPR เก็บข้อมูล Lot และวันหมดอายุแยกตาม "ยาแต่ละชนิด" ภายในกล่อง (`cprLots`)
-* **ฟอร์มกรอกข้อมูล (Box In):** เมื่อเลือกกล่อง CPR ระบบจะแสดงช่องกรอก **เลข Lot** และ **วันหมดอายุ** กำกับไว้ที่บรรทัดของ "ยาที่ใช้ไป" แต่ละรายการแทน เพื่อให้ผู้ใช้งานเลือกยาที่ใช้ไปก่อน แล้วจึงกรอก Lot ของยานั้นๆ
-* **Dashboard & Modal:** หน้าแสดงผลกล่อง CPR จะค้นหายาที่หมดอายุเร็วที่สุดในกล่องมาแสดงผลเป็นตัวแทนของกล่องนั้น และเมื่อกดดูรายละเอียด จะเห็นรายการยาทั้งหมดพร้อม Lot แยกรายตัว
-
-สามารถคัดลอกโค้ดด้านล่างไปทับไฟล์ `boxmaster-cpr-lot.html` เดิมได้เลยครับ
-
 ```html
 <!DOCTYPE html>
 <html lang="th">
@@ -119,7 +111,7 @@ const PHARMACISTS = ['ภญ.ศิริณิช','ภญ.พัชริน�
 const WARDS = ['ER','EMS','Ward ชาย','Ward หญิง','Ward 3','Ward ICU','ห้องคลอด','OR','ห้องยา OPD','ห้องยา IPD'];
 const PHARM_LOCS = ['ห้องยา OPD','ห้องยา IPD'];
 const PROBLEMS = ['ไม่พบ Med error','ใช้ยาไป แต่ไม่ได้ key ใน HOSxP','key ใช้ยาไม่ตรงกับที่ใช้ไปจริง','พบยาหายไปจากกล่องโดยไม่มีผู้ป่วยใช้','พบยา/Lot ไม่ตรงกับรายการหน้ากล่อง','อื่นๆ'];
-const KEY = 'bym_boxmaster_cprlot_demo_v2';
+const KEY = 'bym_boxmaster_cprlot_demo_v3';
 
 function boxType(n){ return n<=4 ? 'HAD' : 'CPR'; }
 function boxDrugs(n){ return n<=4 ? DRUGS_HAD : DRUGS_CPR; }
@@ -137,7 +129,6 @@ function statusOf(days){
   if(days<30) return {label:'<30 วัน',cls:'b-d30'};
   return {label:'ปกติ',cls:'b-ok'};
 }
-// คำนวณวันหมดอายุ "จริง" ของกล่อง (อันที่ใกล้กว่าระหว่างตัวกล่อง กับ ยาข้างใน)
 function effExpiry(box){
   const own = box.expiry;
   let inner = null;
@@ -161,7 +152,6 @@ function seedData(){
       box.shortDrug = d;
       box.shortExpiry = addDays(60 + (n*17)%160);
     } else {
-      // สร้าง Lot แยกรายยา สำหรับกล่อง CPR
       box.cprLots = DRUGS_CPR.map((d, i) => ({
         drug: d,
         lotNo: 'CPR-' + (2600 + n*3 + i),
@@ -170,14 +160,13 @@ function seedData(){
     }
     boxes.push(box);
   }
-  // จำลองเคสหมดอายุ
-  boxes[6].cprLots[1].lotExpiry = addDays(4);   // กล่อง 7 (CPR) ยาตัวนึงใกล้หมดอายุ
-  boxes[11].cprLots[0].lotExpiry = addDays(-2); // กล่อง 12 (CPR) ยาตัวนึงหมดอายุแล้ว
-  boxes[1].shortExpiry = addDays(20);           // กล่อง 2 (HAD) ใกล้หมดอายุ
+  boxes[6].cprLots[1].lotExpiry = addDays(4);
+  boxes[11].cprLots[0].lotExpiry = addDays(-2);
+  boxes[1].shortExpiry = addDays(20);
 
   const exchanges = [
     { id:'X1', date:addDays(-3), boxNo:7, boxOutNo:null, ward:'ER', pharmacist:'ภญ.พัชรินทร์',
-      items:[{drug:'Adrenaline 1mg/ml',qty:2,lotNo:'CPR-9042',lotExpiry:addDays(90)},{drug:'50% Glucose',qty:1,lotNo:'CPR-9043',lotExpiry:addDays(120)}],
+      items:[{drug:'Adrenaline 1mg/ml',qty:2,newLotNo:'CPR-9042',newLotExpiry:addDays(90)},{drug:'50% Glucose',qty:1,newLotNo:'CPR-9043',newLotExpiry:addDays(120)}],
       problem:'ไม่พบ Med error', note:'', newExpiry:addDays(87) },
     { id:'X2', date:addDays(-9), boxNo:1, boxOutNo:null, ward:'ICU', pharmacist:'ภก.ธวัช',
       items:[{drug:'Amiodarone 150 mg/3ml',qty:3},{drug:'Adenosine 6 mg/2ml',qty:1}],
@@ -196,7 +185,7 @@ function saveData(){ try{ localStorage.setItem(KEY, JSON.stringify(state.data));
 function blankForm(){
   return { boxNo:'', boxOutNo:'', ward:'', pharmacist:'', dateIn: iso(new Date()),
            shortDrug:'', shortExpiry:'', 
-           rows:[{drug:'',qty:1, lotNo:'', lotExpiry:''}], problem:'', otherNote:'' };
+           rows:[{drug:'',qty:1, newLotNo:'', newLotExpiry:''}], problem:'', otherNote:'' };
 }
 const state = {
   view:'form', adminOk:false, pinInput:'', pinError:false,
@@ -217,12 +206,12 @@ function lockAdmin(){ setState({adminOk:false,pinInput:''}); }
 function setBoxNo(v){
   const bx = state.data.boxes.find(b=>String(b.no)===v);
   const w = bx && bx.ward && !PHARM_LOCS.includes(bx.ward) ? bx.ward : state.form.ward;
-  state.form = { ...state.form, boxNo:v, ward:w, rows:[{drug:'',qty:1, lotNo:'', lotExpiry:''}], shortDrug:'', shortExpiry:'' };
+  state.form = { ...state.form, boxNo:v, ward:w, rows:[{drug:'',qty:1, newLotNo:'', newLotExpiry:''}], shortDrug:'', shortExpiry:'' };
   state.formError=''; render();
 }
 function setFormField(field, v){ state.form = { ...state.form, [field]: v }; state.formError=''; render(); }
-function addRow(){ state.form.rows = state.form.rows.concat([{drug:'',qty:1, lotNo:'', lotExpiry:''}]); render(); }
-function removeRow(i){ const rows = state.form.rows.filter((_,j)=>j!==i); state.form.rows = rows.length?rows:[{drug:'',qty:1, lotNo:'', lotExpiry:''}]; render(); }
+function addRow(){ state.form.rows = state.form.rows.concat([{drug:'',qty:1, newLotNo:'', newLotExpiry:''}]); render(); }
+function removeRow(i){ const rows = state.form.rows.filter((_,j)=>j!==i); state.form.rows = rows.length?rows:[{drug:'',qty:1, newLotNo:'', newLotExpiry:''}]; render(); }
 function setRow(i, field, v){ state.form.rows = state.form.rows.map((r,j)=> j===i ? {...r,[field]:v} : r); render(); }
 
 function submitForm(){
@@ -247,13 +236,13 @@ function submitForm(){
     if(!r.drug) continue;
     const qty = Number(r.qty||0);
     if(qty<1){ state.formError='จำนวนที่ใช้ต้องอย่างน้อย 1'; render(); return; }
-    if(bt==='CPR' && (!r.lotNo || !r.lotNo.trim() || !r.lotExpiry)){
-       state.formError=`กรุณาระบุ Lot และวันหมดอายุของยาให้ครบถ้วน (${r.drug})`; render(); return;
+    if(bt==='CPR' && (!r.newLotNo || !r.newLotNo.trim() || !r.newLotExpiry)){
+       state.formError=`กรุณาระบุชื่อ Lot ใหม่และวันหมดอายุใหม่ของยาให้ครบถ้วน (${r.drug})`; render(); return;
     }
     const it = { drug:r.drug, qty };
     if(bt==='CPR') {
-      it.lotNo = r.lotNo.trim(); 
-      it.lotExpiry = r.lotExpiry;
+      it.newLotNo = r.newLotNo.trim(); 
+      it.newLotExpiry = r.newLotExpiry;
     }
     items.push(it);
   }
@@ -272,12 +261,17 @@ function submitForm(){
       if(bt==='HAD'){ 
         patch.shortDrug=f.shortDrug; patch.shortExpiry=f.shortExpiry; 
       } else {
-        // อัปเดต Lot แยกรายยาในกล่อง CPR
         let newLots = b.cprLots ? JSON.parse(JSON.stringify(b.cprLots)) : [];
         items.forEach(it => {
-            const existing = newLots.find(l => l.drug === it.drug);
-            if (existing) { existing.lotNo = it.lotNo; existing.lotExpiry = it.lotExpiry; }
-            else { newLots.push({ drug: it.drug, lotNo: it.lotNo, lotExpiry: it.lotExpiry }); }
+            if (it.newLotNo && it.newLotExpiry) {
+                const existing = newLots.find(l => l.drug === it.drug);
+                if (existing) { 
+                    existing.lotNo = it.newLotNo; 
+                    existing.lotExpiry = it.newLotExpiry; 
+                } else { 
+                    newLots.push({ drug: it.drug, lotNo: it.newLotNo, lotExpiry: it.newLotExpiry }); 
+                }
+            }
         });
         patch.cprLots = newLots;
       }
@@ -311,8 +305,8 @@ function resetData(){
 }
 function exportCsv(){
   const rows = [['วันที่','กล่องเข้า','กล่องออก','Ward','เภสัชกร','ยาที่ใช้ไป','ปัญหา','วันหมดอายุใหม่กล่อง']];
-  state.data.exchanges.slice().sort((a,b)=>b.date.localeCompare(a.date)).forEach(x=>{
-    const items = (x.items||[]).map(it=>it.drug+(it.lotNo?(' (Lot '+it.lotNo+')'):'')+' x'+it.qty).join(' ; ');
+  state.data.exchanges.slice().sort((a,b)=>b.date.localeCompare(b.date)).forEach(x=>{
+    const items = (x.items||[]).map(it=>it.drug+(it.newLotNo?(' (Lot ใหม่: '+it.newLotNo+')'):'')+' x'+it.qty).join(' ; ');
     rows.push([x.date,x.boxNo,x.boxOutNo||'',x.ward,x.pharmacist,items,x.problem,x.newExpiry]);
   });
   const csv = rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
@@ -381,19 +375,19 @@ function formHtml(){
         +'<input type="date" class="input" value="'+esc(f.shortExpiry)+'" onchange="setFormField(\'shortExpiry\',this.value)"></label>'
       +'</div>';
   } else if(bt==='CPR'){
-    typeSpecific = '<div class="notebox">📦 กล่องนี้เป็นกล่อง <strong>CPR</strong> — ยาแต่ละชนิดในกล่องอาจมี Lot และวันหมดอายุต่างกัน กรุณาระบุ <strong>Lot และ วันหมดอายุ</strong> ของยาแต่ละรายการที่ใช้ไปในส่วน "ยาที่ใช้ไป" ด้านล่าง</div>';
+    typeSpecific = '<div class="notebox">📦 กล่องนี้เป็นกล่อง <strong>CPR</strong> — เมื่อเลือกยาที่ใช้ไปแล้ว กรุณากรอก <strong>ชื่อ Lot ใหม่</strong> และ <strong>วันหมดอายุใหม่</strong> ระบบจะทำการเปลี่ยนยาชนิดเดียวกันที่เหลือทั้งหมดในกล่องให้เป็น Lot ใหม่นี้โดยอัตโนมัติ</div>';
   }
 
   const rowsHtml = f.rows.map((r,i)=>{
     const opts = drugOptions.map(d=>'<option '+(r.drug===d?'selected':'')+'>'+d+'</option>').join('');
     const lotInputs = bt === 'CPR' ? (
-      '<label class="field">Lot ของยา<input type="text" class="input" placeholder="เช่น CPR-2601" value="'+esc(r.lotNo||'')+'" oninput="setRow('+i+',\'lotNo\',this.value)"></label>'
-      +'<label class="field">วันหมดอายุ<input type="date" class="input" value="'+esc(r.lotExpiry||'')+'" onchange="setRow('+i+',\'lotExpiry\',this.value)"></label>'
+      '<label class="field">ชื่อ Lot ใหม่<input type="text" class="input" placeholder="เช่น CPR-NEW01" value="'+esc(r.newLotNo||'')+'" oninput="setRow('+i+',\'newLotNo\',this.value)"></label>'
+      +'<label class="field">วันหมดอายุของ Lot ใหม่<input type="date" class="input" value="'+esc(r.newLotExpiry||'')+'" onchange="setRow('+i+',\'newLotExpiry\',this.value)"></label>'
     ) : '';
     
     return '<div class="rowline">'
       +'<div class="formgrid">'
-      +'<label class="field">ยา<select class="select" onchange="setRow('+i+',\'drug\',this.value)"><option value="">— เลือกยา —</option>'+opts+'</select></label>'
+      +'<label class="field">ยาที่ใช้ไป<select class="select" onchange="setRow('+i+',\'drug\',this.value)"><option value="">— เลือกยา —</option>'+opts+'</select></label>'
       +'<label class="field">จำนวนที่ใช้<input type="number" min="1" class="input" value="'+r.qty+'" oninput="setRow('+i+',\'qty\',this.value)"></label>'
       + lotInputs
       +'</div>'
@@ -403,7 +397,7 @@ function formHtml(){
 
   return '<section style="max-width:780px;margin:0 auto">'
     +'<h2 class="section-title">บันทึกการแลกเปลี่ยนกล่อง (Box In)</h2>'
-    +'<p class="section-sub">ward นำกล่องมาแลกเปลี่ยน — HAD บันทึกแบบเดิม / CPR ต้องระบุเลข Lot และวันหมดอายุของยาที่ใช้ไปในแต่ละแถว</p>'
+    +'<p class="section-sub">ward นำกล่องมาแลกเปลี่ยน — HAD บันทึกแบบเดิม / CPR ระบุชื่อ Lot ใหม่และวันหมดอายุใหม่เพื่ออัปเดตยาทั้งกล่อง</p>'
     +'<div class="card stack gap16">'
     +'<div class="formgrid">'
     +'<label class="field">กล่องที่นำมาเปลี่ยน (Box In) *<select class="select" onchange="setBoxNo(this.value)"><option value="">— เลือกกล่อง —</option>'+boxOptions+'</select></label>'
@@ -416,7 +410,7 @@ function formHtml(){
     +(bt ? typeSpecific : '<div class="hint">เลือกกล่องก่อน เพื่อแสดงฟอร์มที่เหมาะกับประเภทกล่อง (HAD / CPR)</div>')
     +'<div style="border-top:1px solid #EDF2F2;padding-top:14px">'
     +'<div style="font-size:13.5px;font-weight:800;margin-bottom:2px">ยาที่ใช้ไป</div>'
-    +'<div class="hint" style="margin-bottom:10px">ถ้าไม่มีการใช้ยา ปล่อยว่างได้'+(bt==='CPR'?' · หากมีการใช้ยาในกล่อง CPR กรุณาเลือกยาและกรอก Lot ให้ครบถ้วน':'')+'</div>'
+    +'<div class="hint" style="margin-bottom:10px">ถ้าไม่มีการใช้ยา ปล่อยว่างได้'+(bt==='CPR'?' · หากมียาถูกใช้ไป ให้เลือกยาชนิดนั้น พร้อมระบุชื่อ Lot ใหม่และวันหมดอายุใหม่เพื่อเปลี่ยนยาทั้งชนิดในกล่อง':'')+'</div>'
     +'<div class="stack gap10">'+rowsHtml+'</div>'
     +'<button class="dashed" style="margin-top:10px" onclick="addRow()">+ เพิ่มรายการยา</button>'
     +'</div>'
@@ -434,7 +428,6 @@ function dashHtml(){
   const boxes = state.data.boxes;
   const counts = {ok:0,d30:0,d7:0,expired:0};
   boxes.forEach(b=>{ const st = statusOf(daysLeft(effExpiry(b))); counts[st.cls.replace('b-','')]++; });
-  const chipBase='';
   const chips = [
     {v:boxes.filter(b=>!isPharm(b.ward)).length+' / '+boxes.length, l:'📦 กล่องอยู่ตาม ward', cls:'b-had', c:'#F0E9DE;color:#8A6A3D;border-color:#E7DCCE'},
     {v:counts.ok, l:'📦 ปกติ', c:'#E3F5EC;color:#137A52;border-color:#CBEBDB'},
@@ -450,7 +443,7 @@ function dashHtml(){
   let body = '';
   if(state.dashTab==='box'){
     const cards = boxes.map(boxCardHtml).join('');
-    body = '<h2 class="section-title">📦 สถานะกล่องยา</h2><p class="section-sub">กล่อง HAD (1–4) มียา 13 รายการ · กล่อง CPR (5–22) มียา 6 รายการ เก็บ Lot แยกรายยา</p><div class="boxgrid">'+cards+'</div>';
+    body = '<h2 class="section-title">📦 สถานะกล่องยา</h2><p class="section-sub">กล่อง HAD (1–4) มียา 13 รายการ · กล่อง CPR (5–22) มียา 6 รายการ จัดการ Lot ใหม่ตามชนิดยา</p><div class="boxgrid">'+cards+'</div>';
   } else if(state.dashTab==='lot'){
     const cprBoxes = boxes.filter(b=>b.type==='CPR').map(b=>{
         const shortest = (b.cprLots||[]).reduce((min, c) => (!min || c.lotExpiry < min.lotExpiry) ? c : min, null);
@@ -465,18 +458,18 @@ function dashHtml(){
       const expStr = shortest ? fmtThai(shortest.lotExpiry) : '—';
       const drugStr = shortest ? esc(shortest.drug) : '—';
       return '<tr style="'+rowBg+'"><td>'+boxName(b.no)+'</td><td>'+(isPharm(b.ward)?pharmLabel(b.ward):'อยู่ที่ '+esc(b.ward))+'</td>'
-        +'<td>'+drugStr+'<br><strong style="font-size:11.5px;color:var(--lot-fg)">Lot '+lotStr+'</strong></td><td>'+expStr+'</td>'
+        +'<td>'+drugStr+'<br><strong style="font-size:11.5px;color:var(--lot-fg)">Lot ใหม่: '+lotStr+'</strong></td><td>'+expStr+'</td>'
         +'<td>'+(d<0?('เกินมา '+(-d)+' วัน'):(d+' วัน'))+'</td><td><span class="badge '+st.cls+'">'+st.label+'</span></td></tr>';
     }).join('');
     const nExpired = cprBoxes.filter(x=>x.d<0).length, nSoon = cprBoxes.filter(x=>x.d>=0&&x.d<30).length;
     body = '<h2 class="section-title">🧪 Lot Tracking — กล่อง CPR</h2>'
-      +'<p class="section-sub">แสดงยาที่ <strong>อายุสั้นที่สุด</strong> ภายในกล่อง CPR แต่ละใบ — ช่วยติดตาม Lot ของยาตัวที่ใกล้หมดอายุที่สุดในกล่องได้อย่างรวดเร็ว</p>'
+      +'<p class="section-sub">แสดงยาที่ <strong>อายุสั้นที่สุด</strong> ภายในกล่อง CPR แต่ละใบ — ติดตาม Lot ใหม่ของยาตัวที่ใกล้หมดอายุที่สุด</p>'
       +'<div class="grid-chips" style="margin-bottom:16px">'
       +'<div class="chip" style="background:#FBE3E3;color:#B03030;border-color:#F0C3C3"><div class="v">'+nExpired+'</div><div class="l">🧪 ยาในกล่องหมดอายุแล้ว</div></div>'
       +'<div class="chip" style="background:#FCF3D7;color:#96690B;border-color:#F0E2B6"><div class="v">'+nSoon+'</div><div class="l">🧪 ยาใกล้หมดอายุ (&lt;30 วัน)</div></div>'
       +'<div class="chip" style="background:#EAF0FB;color:#3558A8;border-color:#D7E1F7"><div class="v">'+cprBoxes.length+'</div><div class="l">🧪 กล่อง CPR ทั้งหมด</div></div>'
       +'</div>'
-      +'<div class="card" style="overflow-x:auto"><table><thead><tr><th>กล่อง</th><th>อยู่ที่</th><th>ยาที่สั้นที่สุด / เลข Lot</th><th>วันหมดอายุ Lot</th><th>เหลือ</th><th>สถานะ</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      +'<div class="card" style="overflow-x:auto"><table><thead><tr><th>กล่อง</th><th>อยู่ที่</th><th>ยาที่สั้นที่สุด / Lot ใหม่</th><th>วันหมดอายุใหม่</th><th>เหลือ</th><th>สถานะ</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
       +'<p class="hint" style="margin-top:10px">คลิกที่การ์ดกล่องในแท็บ "📦 กล่อง" เพื่อดูรายละเอียด Lot แยกตามรายการยาทั้ง 6 ชนิดของกล่อง CPR นั้น ๆ</p>';
   } else if(state.dashTab==='loc'){
     const locs = WARDS.concat(PHARM_LOCS).filter((v,i,a)=>a.indexOf(v)===i);
@@ -488,7 +481,7 @@ function dashHtml(){
           +'<div style="font-weight:700;font-size:12.5px">📦 '+boxName(b.no)+'</div>'
           +'<div class="flex gap8" style="align-items:center"><span class="small tan-muted">หมด '+fmtThai(effExpiry(b))+'</span><span class="badge '+st.cls+'">'+st.label+'</span></div></div>';
       }).join('');
-      return '<div class="tan-card"><div class="flex" style="align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-weight:800;font-size:14px">'+esc(loc)+'</div><span class="badge" style="background:#F0E9DE;color:#8A7360">'+bs.length+' กล่อง</span></div>'
+      return '<div class="tan-card"><div class="flex" style="align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-weight:800;font-size:14px">'+esc(loc)+'</div><span class="badge" style="background:#F0E9DE;color:#8A6A3D">'+bs.length+' กล่อง</span></div>'
         +(bs.length? '<div class="stack gap8">'+items+'</div>' : '<div class="small" style="color:#B3A18D;font-style:italic">ไม่มีกล่อง</div>')+'</div>';
     }).join('');
     body = '<h2 class="section-title">📍 ตำแหน่งกล่อง</h2><p class="section-sub">แต่ละที่มีกล่องอะไรอยู่บ้าง</p><div class="boxgrid">'+cardsHtml+'</div>';
@@ -521,7 +514,7 @@ function boxDetailHtml(){
       const lotInfo = (b.cprLots||[]).find(c => c.drug === drug);
       const st = lotInfo && lotInfo.lotExpiry ? statusOf(daysLeft(lotInfo.lotExpiry)) : null;
       return '<tr><td style="font-weight:600">'+esc(drug)+'</td><td>'
-        + (lotInfo && lotInfo.lotNo ? ('<strong>Lot '+esc(lotInfo.lotNo)+'</strong> · หมด '+fmtThai(lotInfo.lotExpiry)+' '+(st?'<span class="badge '+st.cls+'">'+st.label+'</span>':'')) : '<span class="tan-muted small">— ยังไม่มีข้อมูล Lot —</span>')
+        + (lotInfo && lotInfo.lotNo ? ('<strong>Lot ใหม่: '+esc(lotInfo.lotNo)+'</strong> · หมด '+fmtThai(lotInfo.lotExpiry)+' '+(st?'<span class="badge '+st.cls+'">'+st.label+'</span>':'')) : '<span class="tan-muted small">— ยังไม่มีข้อมูล Lot ใหม่ —</span>')
         +'</td></tr>';
     }).join('');
   }
@@ -530,17 +523,17 @@ function boxDetailHtml(){
     +'<div class="flex" style="align-items:flex-start;justify-content:space-between;gap:10px">'
     +'<div><div style="font-weight:800;font-size:16px">'+boxName(b.no)+'</div><div class="small tan-muted">'+(isPharm(b.ward)?pharmLabel(b.ward):'อยู่ที่ '+esc(b.ward))+' · หมดอายุกล่อง '+fmtThai(b.expiry)+'</div></div>'
     +'<button class="x-btn" onclick="closeBoxDetail()">✕</button></div>'
-    +'<table><thead><tr><th>ยา</th><th>Lot / วันหมดอายุ</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<table><thead><tr><th>ยา</th><th>Lot ใหม่ / วันหมดอายุใหม่</th></tr></thead><tbody>'+rows+'</tbody></table>'
     +'</div></div>';
 }
 
 /* ---- HISTORY ---- */
 function historyHtml(){
   const rows = state.data.exchanges.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>{
-    const itemsTxt = (x.items||[]).length ? x.items.map(it=>it.drug+(it.lotNo?(' (Lot '+it.lotNo+')'):'')+' ×'+it.qty).join(' · ') : 'ไม่มีการใช้ยา';
+    const itemsTxt = (x.items||[]).length ? x.items.map(it=>it.drug+(it.newLotNo?(' (Lot ใหม่: '+it.newLotNo+')'):'')+' ×'+it.qty).join(' · ') : 'ไม่มีการใช้ยา';
     const bad = x.problem !== 'ไม่พบ Med error';
     const bt = boxType(x.boxNo);
-    const lotBoxTxt = bt === 'HAD' ? (x.shortDrug ? esc(x.shortDrug) : '—') : 'ระบุในรายการยาที่ใช้';
+    const lotBoxTxt = bt === 'HAD' ? (x.shortDrug ? esc(x.shortDrug) : '—') : 'อัปเดตตามรายการยาที่ใช้';
     
     return '<tr>'
       +'<td>'+fmtThai(x.date)+'</td>'
@@ -560,7 +553,7 @@ function historyHtml(){
     +'</section>';
 }
 
-/* ---- REPORT (simplified, HAD behaves same, CPR shows Lot) ---- */
+/* ---- REPORT ---- */
 function reportHtml(){
   const typeMatch = x => state.reportBoxType==='all' || boxType(x.boxNo)===state.reportBoxType;
   const inRange = x => { const mk=(x.date||'').slice(0,7); return mk>=state.reportFrom && mk<=state.reportTo; };
@@ -569,7 +562,7 @@ function reportHtml(){
     const matches = filtered.filter(x=>x.problem===p);
     const details = [];
     if(p!=='ไม่พบ Med error') matches.forEach(x=>{
-      (x.items||[]).forEach(it=>details.push('- '+it.drug+(it.lotNo?(' (Lot '+it.lotNo+')'):'')+' ×'+it.qty+' (กล่อง '+x.boxNo+')'));
+      (x.items||[]).forEach(it=>details.push('- '+it.drug+(it.newLotNo?(' (Lot ใหม่: '+it.newLotNo+')'):'')+' ×'+it.qty+' (กล่อง '+x.boxNo+')'));
       if(x.note) details.push('- '+x.note);
     });
     return '<tr><td>'+(i+1)+'.</td><td style="font-weight:600">'+p+'</td><td style="text-align:right;font-weight:700">'+matches.length+'</td>'
@@ -581,7 +574,7 @@ function reportHtml(){
   const titleBoxes = state.reportBoxType==='HAD' ? 'กล่องยา High Alert Drug (HAD)' : state.reportBoxType==='CPR' ? 'กล่องยา CPR' : 'กล่องยา HAD และ CPR';
   return '<section>'
     +'<div class="card flex wrap-flex" style="align-items:end;gap:12px;margin-bottom:16px" data-noprint>'
-    +'<div><h2 class="section-title">รายงานสรุปอัตโนมัติ</h2><p class="small muted" style="margin:0">HAD รายงานแบบเดิม · CPR แสดง Lot กำกับยาที่ใช้ไปด้วย</p></div>'
+    +'<div><h2 class="section-title">รายงานสรุปอัตโนมัติ</h2><p class="small muted" style="margin:0">สรุปการแลกเปลี่ยนและรายการยาที่ใช้ไปพร้อม Lot ใหม่</p></div>'
     +'<label class="field">ประเภทกล่อง<select class="select" onchange="setState({reportBoxType:this.value})">'
       +'<option value="all" '+(state.reportBoxType==='all'?'selected':'')+'>ทั้งคู่ (HAD + CPR)</option>'
       +'<option value="HAD" '+(state.reportBoxType==='HAD'?'selected':'')+'>HAD (กล่อง 1–4)</option>'
@@ -610,7 +603,7 @@ function adminHtml(){
       const dExp = '<input type="date" class="input" style="min-height:34px;padding:5px 7px" value="'+esc(b.shortExpiry||'')+'" onchange="adminSetShortExpiry('+b.no+',this.value)">';
       extra = '<td>'+dSel+'</td><td>'+dExp+'</td>';
     } else {
-      extra = '<td colspan="2" style="text-align:center;color:var(--muted);font-size:12px;background:#F8FBFA">แก้ไข Lot ยาแต่ละตัวได้จากการบันทึก (Box In)</td>';
+      extra = '<td colspan="2" style="text-align:center;color:var(--muted);font-size:12px;background:#F8FBFA">จัดการ Lot ใหม่ได้จากการบันทึก (Box In)</td>';
     }
     return '<tr><td style="font-weight:700">'+b.no+' <span class="badge '+(b.type==='HAD'?'b-had':'b-lot')+'">'+b.type+'</span></td><td>'+wardSel+'</td><td>'+expInp+'</td>'+extra+'<td><span class="badge '+st.cls+'">'+st.label+'</span></td></tr>';
   }).join('');
